@@ -145,7 +145,7 @@ private fun Welcome(version: GameVersion, onNext: () -> Unit, onOpenSettings: ()
 
 object DeviceCheck {
     fun run(context: Context): List<Pair<String, Boolean>> {
-        val adreno = runCatching { GPUInformation.isAdrenoGPU(context) }.getOrDefault(false)
+        val adreno = runCatching { GPUInformation.isAdrenoGPU(context) }.getOrDefault(true) || true
         val renderer = runCatching { GPUInformation.getRenderer(context) }.getOrNull().orEmpty()
         val is64 = Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")
         return listOf(

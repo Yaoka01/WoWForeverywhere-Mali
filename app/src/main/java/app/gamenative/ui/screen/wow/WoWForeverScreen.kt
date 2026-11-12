@@ -887,6 +887,7 @@ internal fun Throwable.isPermissionDenied() =
 
 private const val DEFAULT_DRIVER = "Turnip-WoW-scheduler-test"
 private const val ADRENO_8XX_DRIVER = "Turnip-V32-RP6sched"
+private const val MALI_PANVK_DRIVER = "Mesa-PanVK-26.3.0-devel-795ca7ff"
 
 private const val PROTON_VERSION = "proton-11.0-90624-arm64ec"
 private const val DXVK_VERSION = "2.4.1-wow-aarch64-test"
@@ -909,9 +910,12 @@ internal data class GpuProfile(
          * device memory under Horizon OS (issue #2). 720p and a 1.5 GB video memory cap ease the shared memory.
          */
         val QUEST = GpuProfile("System", "", "1280x720", "Meta Quest 3", "Meta Quest 3 / XR2 Gen 2", maxDeviceMemory = 1536)
+        val MALI_PANVK = GpuProfile(MALI_PANVK_DRIVER, "", "1280x720", "Mali PanVK", "MediaTek Dimensity / Mali PanVK", maxDeviceMemory = 2048)
+        private fun isMaliDevice(context: Context): Boolean { val r = runCatching { GPUInformation.getRenderer(context) }.getOrNull().orEmpty(); val soc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else ""; return r.contains("Mali", true) || r.contains("Immortalis", true) || soc.startsWith("MT", true) || Build.HARDWARE.contains("mt", true) }
 
         fun detect(context: Context) = when {
             isMetaQuest3(Build.MANUFACTURER, Build.MODEL, if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else "") -> QUEST
+            isMaliDevice(context) -> MALI_PANVK
             isAdreno8xxDevice(context) -> ADRENO_8XX
             else -> ADRENO_740
         }
@@ -930,7 +934,7 @@ internal data class GpuProfile(
  * The pixel count stays the same as [baseSize], so GPU cost matches the 16:9 default.
  */
 internal fun graphicsDriverConfig(gpu: GpuProfile): String =
-    "version=${gpu.driver},adrenotoolsTurnip=1,resourceType=buffer,bcnEmulation=auto,quality=high" +
+    "version=${gpu.driver},adrenotoolsTurnip=1,resourceType=buffer,bcnEmulation=auto,bcnEmulationType=compute,vulkanVersion=1.3,gpuName=NVIDIA GeForce GTX 1060,quality=high" +
         (if (gpu.maxDeviceMemory > 0) ",maxDeviceMemory=${gpu.maxDeviceMemory}" else "")
 
 /**
@@ -1038,14 +1042,14 @@ internal fun prepareLaunch(
 }
 
 private fun containerConfig(gameRoot: File, product: WowProduct, gpu: GpuProfile, screenSize: String): JSONObject {
-    val samsungEnv = if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) " FD_DEV_FEATURES=enable_tp_ubwc_flag_hint=1" else ""
+    val samsungEnv = (if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) " FD_DEV_FEATURES=enable_tp_ubwc_flag_hint=1" else "") + (if (gpu.driver == MALI_PANVK_DRIVER) " PAN_I_WANT_A_BROKEN_VULKAN_DRIVER=1 MESA_NO_ERROR=1 WRAPPER_EMULATE_BCN=3 ENABLE_BCN_COMPUTE=1 BCN_COMPUTE_AUTO=1" else "")
     val envVars = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=0 MESA_VK_WSI_PRESENT_MODE=mailbox${if (gpu.tuDebug.isNotEmpty()) " TU_DEBUG=${gpu.tuDebug}" else ""} VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144$samsungEnv"
     return JSONObject().apply {
         put("id", CONTAINER_ID)
         put("name", "WoW Forever")
         put("screenSize", screenSize)
         put("envVars", envVars)
-        put("graphicsDriver", "Wrapper")
+        put("graphicsDriver", if (gpu.driver == MALI_PANVK_DRIVER) "Wrapper-gamenative" else "Wrapper")
         put("graphicsDriverVersion", gpu.driver)
         put("graphicsDriverConfig", graphicsDriverConfig(gpu))
         put("displayRenderer", "vulkan")
@@ -1236,6 +1240,7 @@ private val RESOLUTION_KEYS = listOf("gxFullscreenResolution", "gxWindowedResolu
 private fun installBundledComponents(context: Context, onStatus: (String) -> Unit) {
     installDriver(context, DEFAULT_DRIVER, "turnip-wow-scheduler-test.zip", onStatus)
     installDriver(context, ADRENO_8XX_DRIVER, "turnip-V32-RP6sched.zip", onStatus)
+    installDriver(context, MALI_PANVK_DRIVER, "panvk-mali.zip", onStatus)
 
     val protonDir = File(ImageFs.getSharedProtonDir(context), PROTON_VERSION)
     if (!File(protonDir, "profile.json").exists() || !File(protonDir, "bin/wine").exists()) {

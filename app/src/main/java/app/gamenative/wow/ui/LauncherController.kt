@@ -120,7 +120,7 @@ class LauncherController(
 
     /** Set when Play is pressed on a device on for so long that the game's clock stops: how many days it's been on. */
     var restartWarningDays by mutableStateOf<Long?>(null)
-    private val supportedGpu = runCatching { com.winlator.core.GPUInformation.isAdrenoGPU(context) }.getOrDefault(true)
+    private val supportedGpu = true
 
     /** The switch to the launch version is running; [convertProgress] and [convertSpeed] follow it. */
     var isConverting by mutableStateOf(false)
