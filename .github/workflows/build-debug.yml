@@ -1,4 +1,4 @@
-﻿name: Build Debug APK
+name: Build Debug APK
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
       - name: Install the NDK
         run: |
           NDK=$(sed -n 's/.*ndkVersion = "\(.*\)".*/\1/p' app/build.gradle.kts)
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;\" > /dev/null
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK" > /dev/null
 
       - name: Fetch runtime components
         run: tools/fetch_components.sh
