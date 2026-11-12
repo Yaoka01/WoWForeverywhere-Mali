@@ -1,4 +1,4 @@
-name: Build Debug APK
+﻿name: Build Debug APK
 
 on:
   workflow_dispatch:
@@ -23,6 +23,9 @@ jobs:
 
       - name: Fetch runtime components
         run: tools/fetch_components.sh
+
+      - name: Create local.properties
+        run: echo "CURSEFORGE_API_KEY=${{ secrets.CURSEFORGE_API_KEY }}" > local.properties
 
       - name: Build Debug APK
         run: ./gradlew --no-daemon assembleModernDebug
